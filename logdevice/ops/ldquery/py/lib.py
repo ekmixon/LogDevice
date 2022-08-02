@@ -66,9 +66,7 @@ class LDQuery(object):
         cursor = l.execute_query('select * from info')
         """
         results = self._client.query(statement)
-        if not results:
-            return None
-        return Cursor(results[0])
+        return Cursor(results[0]) if results else None
 
     @property
     def tables(self):
@@ -93,10 +91,7 @@ class Row(object):
         return self.get(attr)
 
     def __getitem__(self, key):
-        if type(key) is int:
-            return self._row[key]
-
-        return self.get(key)
+        return self._row[key] if type(key) is int else self.get(key)
 
 
 class Cursor(object):
@@ -107,9 +102,7 @@ class Cursor(object):
 
     def __init__(self, result):
         self._result = result
-        self._indexes = {}
-        for i, header in enumerate(self._result.headers):
-            self._indexes[header] = i
+        self._indexes = {header: i for i, header in enumerate(self._result.headers)}
 
     def __iter__(self):
         for row in self._result.rows:

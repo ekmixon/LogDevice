@@ -58,8 +58,7 @@ def _get_client():
 def _get_nodes_config(client):
     ncm_bin = ncm.get_nodes_configuration(client)
     ncm_json_str = ncm.nodes_configuration_to_json(ncm_bin)
-    ncm_obj = json.loads(ncm_json_str)
-    return ncm_obj
+    return json.loads(ncm_json_str)
 
 
 def _edit_text_with_editor(text: str) -> str:

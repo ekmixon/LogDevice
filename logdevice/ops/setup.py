@@ -36,8 +36,8 @@ def generate_extensions(directory, include_base_dir=True):
         else:
             parent_path = str(path.parent.relative_to(directory))
         package_name = parent_path.replace(os.path.sep, ".")
-        mod_name = "{}.{}".format(package_name, path.name[:-3])
-        print("Module {} from {}".format(mod_name, str(path)))
+        mod_name = f"{package_name}.{path.name[:-3]}"
+        print(f"Module {mod_name} from {str(path)}")
         exts.append(Extension(mod_name, sources=[str(path)]))
     return exts
 

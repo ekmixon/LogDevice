@@ -116,12 +116,11 @@ class SocketAddress:
         return socket_address
 
     def __str__(self) -> str:
-        if self.address_family == SocketAddressFamily.INET:
-            if isinstance(self.address, IPv4Address):
-                return f"{self.address.compressed}:{self.port}"
-            elif isinstance(self.address, IPv6Address):
-                return f"[{self.address.compressed}]:{self.port}"
-            else:
-                raise AssertionError("unreachable")  # pragma: nocover
-        else:
+        if self.address_family != SocketAddressFamily.INET:
             return f"unix:{self.path}"
+        if isinstance(self.address, IPv4Address):
+            return f"{self.address.compressed}:{self.port}"
+        elif isinstance(self.address, IPv6Address):
+            return f"[{self.address.compressed}]:{self.port}"
+        else:
+            raise AssertionError("unreachable")  # pragma: nocover

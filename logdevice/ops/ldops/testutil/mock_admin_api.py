@@ -94,13 +94,10 @@ def gen_word(length: Optional[int] = None) -> str:
         length = random.randint(3, 15)
     VOWELS = "aeiou"
     CONSONANTS = "".join(set(string.ascii_lowercase) - set(VOWELS))
-    word = ""
-    for i in range(length):
-        if i % 2 == 0:
-            word += random.choice(CONSONANTS)
-        else:
-            word += random.choice(VOWELS)
-    return word
+    return "".join(
+        random.choice(CONSONANTS) if i % 2 == 0 else random.choice(VOWELS)
+        for i in range(length)
+    )
 
 
 class MockAdminAPI:
@@ -200,7 +197,7 @@ class MockAdminAPI:
         self._ns_by_name = {}
 
         # generate storage nodes
-        for node_index in range(0, self.num_storage_nodes):
+        for node_index in range(self.num_storage_nodes):
             loc = self._select_random_location()
             name = self.storage_node_name_tmpl.format(
                 node_index=node_index, region=loc[LocationScope.REGION]
@@ -208,26 +205,29 @@ class MockAdminAPI:
             nc = NodeConfig(
                 node_index=node_index,
                 data_address=gen_SocketAddress(),
-                roles={Role.SEQUENCER, Role.STORAGE}
-                if not self.disaggregated
-                else {Role.STORAGE},
+                roles={Role.STORAGE}
+                if self.disaggregated
+                else {Role.SEQUENCER, Role.STORAGE},
                 other_addresses=None,
                 location=self._loc_to_str(loc),
-                sequencer=SequencerConfig(weight=1) if not self.disaggregated else None,
+                sequencer=None
+                if self.disaggregated
+                else SequencerConfig(weight=1),
                 storage=StorageConfig(
                     weight=1, num_shards=self.shards_per_storage_node
                 ),
                 location_per_scope=loc,
                 name=name,
             )
+
             ns = NodeState(
                 node_index=node_index,
                 daemon_state=ServiceState.ALIVE,
-                sequencer_state=SequencerState(
+                sequencer_state=None
+                if self.disaggregated
+                else SequencerState(
                     state=SequencingState.ENABLED, maintenance=None
-                )
-                if not self.disaggregated
-                else None,
+                ),
                 shard_states=[
                     ShardState(
                         data_health=ShardDataHealth.HEALTHY,
@@ -239,6 +239,7 @@ class MockAdminAPI:
                     for _ in range(self.shards_per_storage_node)
                 ],
             )
+
             self._nc_by_node_index[node_index] = nc
             self._nc_by_name[name] = nc
             self._ns_by_node_index[node_index] = ns
@@ -417,17 +418,17 @@ class MockAdminAPI:
 
             assert sh.node.node_index is not None
             nc = self._nc_by_node_index[sh.node.node_index]
-            for shard_index in r:
-                shards.append(
-                    ShardID(
-                        node=NodeID(
-                            node_index=nc.node_index,
-                            name=nc.name,
-                            address=nc.data_address,
-                        ),
-                        shard_index=shard_index,
-                    )
+            shards.extend(
+                ShardID(
+                    node=NodeID(
+                        node_index=nc.node_index,
+                        name=nc.name,
+                        address=nc.data_address,
+                    ),
+                    shard_index=shard_index,
                 )
+                for shard_index in r
+            )
 
         shards = tuple(sorted(shards, key=lambda s: (s.node.node_index, s.shard_index)))
 

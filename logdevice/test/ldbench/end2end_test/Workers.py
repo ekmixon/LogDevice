@@ -34,9 +34,7 @@ class Workers(ExecutionBase):
             remote_inst = self.execution_inst.split()
             remote_inst.append(host)
             remote_inst.append(self.worker_file)
-            remote_inst.append(
-                "{} --worker-id={}/{}".format(self.commands, worker_id, total_worker)
-            )
+            remote_inst.append(f"{self.commands} --worker-id={worker_id}/{total_worker}")
             self.logger.info(remote_inst)
             try:
                 worker_proc = subprocess.Popen(remote_inst)

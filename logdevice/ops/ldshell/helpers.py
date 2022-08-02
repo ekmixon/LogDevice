@@ -25,7 +25,7 @@ def ask_prompt(prompt, options=None, help_str=None, stream=sys.stdout):
     print("")
 
     while answer.lower() not in options:
-        answer = input("{} [{}] {}".format(prompt, "/".join(options), help_suffix))
+        answer = input(f'{prompt} [{"/".join(options)}] {help_suffix}')
 
         if answer == "?" and help_str:
             print(help_str)
@@ -56,19 +56,16 @@ def create_socket_address(
 
 
 def parse_socket_address(raw: str, is_unix: bool = False) -> SocketAddress:
-    if not is_unix:
-        port = DEFAULT_ADMIN_API_PORT
-        tup = raw.rsplit(":", 1)
-        if len(tup) >= 2:
-            port = int(tup[1])
-        address = tup[0]
-        return SocketAddress(
-            address_family=SocketAddressFamily.INET, address=address, port=port
-        )
-    else:
+    if is_unix:
         # TODO: Support parsing unix socket if input is not ipaddress/hostname.
         raise NotImplementedError("Parsing unix sockets is not implemented yet.")
+    tup = raw.rsplit(":", 1)
+    port = int(tup[1]) if len(tup) >= 2 else DEFAULT_ADMIN_API_PORT
+    address = tup[0]
+    return SocketAddress(
+        address_family=SocketAddressFamily.INET, address=address, port=port
+    )
 
 
 def humanize_lsn(lsn):
-    return "e{}n{}".format(lsn >> 32, lsn & 0xFFFFFFFF)
+    return f"e{lsn >> 32}n{lsn & 0xFFFFFFFF}"

@@ -164,7 +164,7 @@ esac
                     ShellQuoted('set -ex')
                 ]
                 if action.name != 'Setup' and \
-                        self.option("PYTHON_VENV", "OFF") == "ON":
+                            self.option("PYTHON_VENV", "OFF") == "ON":
                     pre_actions.extend(self.python_venv())
                 pre_actions.append(
                     ShellQuoted("""

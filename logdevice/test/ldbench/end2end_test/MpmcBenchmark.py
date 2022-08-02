@@ -63,13 +63,12 @@ def main(config_file_name):
     workers = []
 
     for benchmark in benchmarks:
-        worker = config_checker.createWorkers(benchmark, commands, env)
-        if not worker:
-            logger.error("Failed to create workers %d", benchmark)
-            return
-        else:
+        if worker := config_checker.createWorkers(benchmark, commands, env):
             workers.append(worker)
 
+        else:
+            logger.error("Failed to create workers %d", benchmark)
+            return
     # start the workers
     # start read workers and then write workers
     # If any failures when starting the workers, stop all started workers

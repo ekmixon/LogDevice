@@ -52,10 +52,7 @@ class NodeView:
     def node_name(self) -> str:
         # If we don't have name in node config, we should use string data_address
         # representation as name
-        if self.node_config.name:
-            return self.node_config.name
-        else:
-            return str(self.data_address)
+        return self.node_config.name or str(self.data_address)
 
     @property
     def data_address(self) -> SocketAddress:
@@ -120,11 +117,7 @@ class NodeView:
 
     @property
     def sequencer_weight(self) -> Optional[float]:
-        if self.sequencer_config is not None:
-            # pyre-fixme[16]: `Optional` has no attribute `weight`.
-            return self.sequencer_config.weight
-        else:
-            return None
+        return None if self.sequencer_config is None else self.sequencer_config.weight
 
     @property
     def sequencer_state(self) -> Optional[SequencerState]:
@@ -132,11 +125,7 @@ class NodeView:
 
     @property
     def sequencing_state(self) -> Optional[SequencingState]:
-        if self.sequencer_state is not None:
-            # pyre-fixme[16]: `Optional` has no attribute `state`.
-            return self.sequencer_state.state
-        else:
-            return None
+        return self.sequencer_state.state if self.sequencer_state is not None else None
 
     @property
     def storage_config(self) -> Optional[StorageConfig]:
@@ -144,19 +133,11 @@ class NodeView:
 
     @property
     def storage_weight(self) -> Optional[float]:
-        if self.storage_config is not None:
-            # pyre-fixme[16]: `Optional` has no attribute `weight`.
-            return self.storage_config.weight
-        else:
-            return None
+        return self.storage_config.weight if self.storage_config is not None else None
 
     @property
     def num_shards(self) -> int:
-        if self.storage_config is not None:
-            # pyre-fixme[16]: `Optional` has no attribute `num_shards`.
-            return self.storage_config.num_shards
-        else:
-            return 0
+        return self.storage_config.num_shards if self.storage_config is not None else 0
 
     @property
     def shard_states(self) -> Tuple[ShardState, ...]:

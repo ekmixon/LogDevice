@@ -124,9 +124,7 @@ class Results(ExecutionBase):
         line_temp = Template(
             '{"ts":${ts}, "total_byte":${bytes}, "total_records":${records}}\n'
         )
-        with open(
-            self.local_dir + "/total_stats" + type_name + ".json", "w"
-        ) as total_f:
+        with open(f"{self.local_dir}/total_stats{type_name}.json", "w") as total_f:
             for i in range(len(aggregated_stats.ts)):
                 line = line_temp.substitute(
                     ts=aggregated_stats.ts[i],
@@ -182,7 +180,7 @@ class Results(ExecutionBase):
                         float(event_obj["value"]) / 1000
                     )
         # update percentile events
-        for _ts_idx, event_list in enumerate(aggregated_events.events_by_ts):
+        for event_list in aggregated_events.events_by_ts:
             if len(event_list) == 0:
                 aggregated_events.percentile_events.append(None)
             else:
@@ -303,18 +301,18 @@ class Results(ExecutionBase):
         ay.set_major_formatter(ScalarFormatter())
         plt.ticklabel_format(axis="y", style="plain", useOffset=False)
         plt.ylim(min_lat_ms, max_lat_ms)
-        fig_name = self.local_dir + "/" + self.figure_prefix + "_end2end_lats.png"
+        fig_name = f"{self.local_dir}/{self.figure_prefix}_end2end_lats.png"
         self.logger.info("Plotting %s", fig_name)
         # Calculate the pos for boxplot and throughput
         # They may have different counts
         # We use the pos of throuhput as the baseline
         tp_box_ratio = len(write_tp) / len(aggregated_read_events.ts)
-        tp_x = []
-        box_x = []
-        for pos in range(len(write_tp)):
-            tp_x.append(pos)
-        for pos in range(len(aggregated_read_events.ts)):
-            box_x.append((pos + 1) * tp_box_ratio)
+        tp_x = list(range(len(write_tp)))
+        box_x = [
+            (pos + 1) * tp_box_ratio
+            for pos in range(len(aggregated_read_events.ts))
+        ]
+
         if has_read_events:
             plt.boxplot(
                 aggregated_read_events.events_by_ts,
@@ -324,21 +322,18 @@ class Results(ExecutionBase):
             plt.plot(
                 box_x,
                 aggregated_read_events.percentile_events,
-                label="P" + str(100 * self.lat_percentile) + " delivery latency",
+                label=f"P{str(100 * self.lat_percentile)} delivery latency",
             )
+
 
         if has_write_events:
             plt.plot(
                 box_x,
                 aggregated_append_events.percentile_events,
-                label="P" + str(100 * self.lat_percentile) + " append latency",
+                label=f"P{str(100 * self.lat_percentile)} append latency",
             )
-        # If we collect throughput with a short interval_second, the labels on
-        # x-axis may be overlapped. Therefore, we only allow at most 10 labels
-        # to avoid overlapped number
-        x_step = 1
-        if len(tp_x) > 10:
-            x_step = math.ceil(len(tp_x) / 10.0)
+
+        x_step = math.ceil(len(tp_x) / 10.0) if len(tp_x) > 10 else 1
         throughput_pos = tp_x[0::x_step]
         if tp_type == "qps":
             throughput_val = write_qps[0::x_step]

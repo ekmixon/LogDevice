@@ -35,8 +35,7 @@ class HgRepo(object):
         run_command('hg', *args, cwd=self.path, env=self.env)
 
     def get_hg_output(self, *args):
-        cmd = ['hg']
-        cmd.extend(args)
+        cmd = ['hg', *args]
         return subprocess.check_output(cmd, cwd=self.path, env=self.env)
 
 
@@ -79,17 +78,21 @@ def identify_cur_repo_hash(repo):
 def get_local_repo_everstore_bundle_lego_dict(repo):
     cur_hash = identify_cur_repo_hash(repo)
     ancestor = repo.get_hg_output(
-        'log', '-T{node}', '-r', 'ancestor(master, {})'.format(cur_hash)
+        'log', '-T{node}', '-r', f'ancestor(master, {cur_hash})'
     ).strip()
+
 
     with tempfile.NamedTemporaryFile() as bundle:
         try:
             repo.run_hg(
                 'bundle',
-                '--base', ancestor,
-                '-r', '{}%{}'.format(cur_hash, ancestor),
+                '--base',
+                ancestor,
+                '-r',
+                f'{cur_hash}%{ancestor}',
                 bundle.name,
             )
+
         except subprocess.CalledProcessError as ex:
             if ex.returncode == 1:  # No changes, as per `hg bundle --help`.
                 return {'hash': cur_hash}

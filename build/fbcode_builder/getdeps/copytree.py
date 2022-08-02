@@ -36,9 +36,10 @@ def find_eden_root(dirpath):
     """
     if is_windows():
         repo_type, repo_root = containing_repo_type(dirpath)
-        if repo_root is not None:
-            if os.path.exists(os.path.join(repo_root, ".eden", "config")):
-                return os.path.realpath(repo_root)
+        if repo_root is not None and os.path.exists(
+            os.path.join(repo_root, ".eden", "config")
+        ):
+            return os.path.realpath(repo_root)
         return None
 
     try:
@@ -60,10 +61,11 @@ def prefetch_dir_if_eden(dirpath):
     if root is None:
         return
     rel = os.path.relpath(dirpath, root)
-    print("Prefetching %s..." % rel)
+    print(f"Prefetching {rel}...")
     subprocess.call(
-        ["edenfsctl", "prefetch", "--repo", root, "--silent", "%s/**" % rel]
+        ["edenfsctl", "prefetch", "--repo", root, "--silent", f"{rel}/**"]
     )
+
     PREFETCHED_DIRS.add(dirpath)
 
 

@@ -328,18 +328,14 @@ def _get_client():
 
 
 def _clone_attributes(attrs):
-    return {k: v for k, v in attrs.items()}
+    return dict(attrs.items())
 
 
 def _print_attributes(attrs, indentation=0):
     space_shift = " " * indentation
     for k, v in attrs.items():
-        cprint(space_shift + "  - {}: ".format(k.replace("_", "-")), end="")
-        if "is_edited" in v and v["is_edited"]:
-            value_color = "magenta"
-        else:
-            value_color = None
-
+        cprint(space_shift + f'  - {k.replace("_", "-")}: ', end="")
+        value_color = "magenta" if "is_edited" in v and v["is_edited"] else None
         # special handling for backlog and delivery_latency
         if k == "backlog" and v["value"] is not None:
             value = seconds_to_timestr(v["value"])
@@ -347,7 +343,7 @@ def _print_attributes(attrs, indentation=0):
             value = milliseconds_to_timestr(v["value"])
         else:
             value = v["value"]
-        cprint("{}".format(value), value_color, end="")
+        cprint(f"{value}", value_color, end="")
         if not v["is_inherited"]:
             if "is_edited" in v and v["is_edited"]:
                 cprint(" (Edited)", "yellow", end="")
@@ -359,15 +355,18 @@ def _print_attributes(attrs, indentation=0):
 def _print_log_group_helper(lg, indentation=0, show_version=False):
     space_shift = " " * indentation
     cprint(
-        space_shift
-        + "\u25CE "
-        + str(lg)
-        + " ({}..{})".format(lg.range[0], lg.range[1]),
+        (
+            space_shift
+            + "\u25CE "
+            + str(lg)
+            + f" ({lg.range[0]}..{lg.range[1]})"
+        ),
         "yellow",
     )
+
     if show_version:
-        cprint(space_shift + "  Version: {}".format(lg.version))
-    cprint(space_shift + "  Attributes:", "white")
+        cprint(space_shift + f"  Version: {lg.version}")
+    cprint(f"{space_shift}  Attributes:", "white")
     _print_attributes(lg.attrs, indentation)
 
 
@@ -382,19 +381,20 @@ def _print_directory_helper(
     space_shift = " " * indentation
     if level == max_depth:
         cprint(
-            space_shift
-            + "\u25B6\uFE0E "
-            + directory.fully_qualified_name
-            + " [{} log groups, {} children folded]".format(
-                len(directory.logs), len(directory.children)
+            (
+                space_shift
+                + "\u25B6\uFE0E "
+                + directory.fully_qualified_name
+                + f" [{len(directory.logs)} log groups, {len(directory.children)} children folded]"
             ),
             "blue",
         )
+
     else:
         cprint(space_shift + "\u25BC " + directory.fully_qualified_name, "green")
     if show_version:
-        cprint(space_shift + "  Version: {}".format(directory.version))
-    cprint(space_shift + "  Attributes: ", "white")
+        cprint(space_shift + f"  Version: {directory.version}")
+    cprint(f"{space_shift}  Attributes: ", "white")
     _print_attributes(directory.attrs, indentation)
     # print log groups if asked for
     if level < max_depth:
@@ -439,7 +439,7 @@ def _get_logsconfig_node(path=None, logid=None):
         try:
             return c.get_directory(str(path))
         except LogDeviceError:
-            raise KeyError("Path {} is not found!".format(str(path)))
+            raise KeyError(f"Path {str(path)} is not found!")
 
 
 def _update_attributes_time_string(attrs):
@@ -450,7 +450,7 @@ def _update_attributes_time_string(attrs):
             try:
                 attrs[k] = timestr_to_seconds(v)
             except ValueError as e:
-                cprint("backlog: {}".format(e), "red")
+                cprint(f"backlog: {e}", "red")
                 return None
         elif k == "delivery_latency" and v is not None:
             # we expect the value to be string
@@ -458,7 +458,7 @@ def _update_attributes_time_string(attrs):
             try:
                 attrs[k] = timestr_to_milliseconds(v)
             except ValueError as e:
-                cprint("delivery-latency: {}".format(e), "red")
+                cprint(f"delivery-latency: {e}", "red")
                 return None
     return attrs
 
@@ -476,7 +476,7 @@ def _update_shadow_params(attrs):
         try:
             ratio = float(shadow["ratio"])
         except ValueError as e:
-            cprint("shadow ratio: {}".format(e), "red")
+            cprint(f"shadow ratio: {e}", "red")
             return None
         if ratio < 0.0 or ratio > 1.0:
             cprint("shadow ratio: must be in range [0.0, 1.0]", "red")
@@ -552,18 +552,15 @@ class Logs:
         try:
             c = _get_client()
             if is_directory:
-                d = c.make_directory(str(path), True, attributes)
+                d = c.make_directory(path, True, attributes)
                 _print_directory_helper(
                     0, d, max_depth=1, print_log_groups=False, show_version=show_version
                 )
             else:
-                lg = c.make_log_group(str(path), from_id, to_id, attributes, True)
+                lg = c.make_log_group(path, from_id, to_id, attributes, True)
                 _print_log_group_helper(lg, show_version=show_version)
         except LogDeviceError as e:
-            cprint(
-                "Could not create '{}'. {}: {}".format(path, e.args[1], e.args[3]),
-                "red",
-            )
+            cprint(f"Could not create '{path}'. {e.args[1]}: {e.args[3]}", "red")
 
             return 1
 
@@ -591,7 +588,7 @@ class Logs:
         try:
             node = _get_logsconfig_node(path, logid)
         except KeyError as e:
-            cprint("Error: {}".format(e), "red")
+            cprint(f"Error: {e}", "red")
             return 1
 
         if isinstance(node, Directory):
@@ -622,19 +619,17 @@ class Logs:
         try:
             c = _get_client()
             if not context.get_context().args.yes and not confirm(
-                "Are you sure you want to rename "
-                '"{}" to "{}"? (y/n)'.format(old_path, new_path)
+                f'Are you sure you want to rename "{old_path}" to "{new_path}"? (y/n)'
             ):
                 return
-            version = c.rename(str(old_path), str(new_path))
+            version = c.rename(old_path, new_path)
             cprint(
-                "Path '{}' has been renamed to '{}' in version {}".format(
-                    old_path, new_path, version
-                )
+                f"Path '{old_path}' has been renamed to '{new_path}' in version {version}"
             )
 
+
         except LogDeviceError as e:
-            cprint("Cannot perform rename. {}: {}".format(e.args[1], e.args[3]), "red")
+            cprint(f"Cannot perform rename. {e.args[1]}: {e.args[3]}", "red")
 
         return 1
 
@@ -672,7 +667,7 @@ class Logs:
             node = _get_logsconfig_node(path)
             current_attributes = node.attrs
         except KeyError as e:
-            cprint("Error: {}".format(e), "red")
+            cprint(f"Error: {e}", "red")
             return 1
 
         # Are we unsetting some attributes?
@@ -695,19 +690,12 @@ class Logs:
         for k in unset:
             if kwargs.get(k) is not None:
                 # We cannot set and unset the value at the same time!
-                cprint(
-                    "You cannot set attribute '{}' and unset it at the same"
-                    " time!".format(k),
-                    "red",
-                )
+                cprint(f"You cannot set attribute '{k}' and unset it at the same time!", "red")
                 return 3
             # do we really need to unset it? is it already unset (and overridden)
             if k not in current_attributes:
                 # We don't know anything about this attribute!
-                cprint(
-                    "Unknown attribute '{}' that you are trying to " "unset!".format(k),
-                    "red",
-                )
+                cprint(f"Unknown attribute '{k}' that you are trying to unset!", "red")
                 return 1
 
             if current_attributes[k]["is_inherited"] is False:
@@ -746,26 +734,19 @@ class Logs:
         ctx = context.get_context()
         try:
             if not ctx.args.yes and not confirm(
-                "Are you sure you want to update the attributes at '{}'? (y/n)".format(
-                    path
-                )
+                f"Are you sure you want to update the attributes at '{path}'? (y/n)"
             ):
                 return
             c = _get_client()
             version = c.set_attributes(str(path), effective_attributes_to_apply)
-            cprint(
-                "Attributes for '{}' has been updated in version {}!".format(
-                    path, version
-                )
-            )
+            cprint(f"Attributes for '{path}' has been updated in version {version}!")
 
         except LogDeviceError as e:
             cprint(
-                "Cannot update attributes for '{}'. {}: {}".format(
-                    path, e.args[1], e.args[3]
-                ),
+                f"Cannot update attributes for '{path}'. {e.args[1]}: {e.args[3]}",
                 "red",
             )
+
 
             return 1
 
@@ -784,26 +765,16 @@ class Logs:
         """
         try:
             c = _get_client()
-            current_log_group = c.get_log_group_by_name(str(path))
+            current_log_group = c.get_log_group_by_name(path)
             if not context.get_context().args.yes and not confirm(
-                "Are you sure you want to set"
-                " the log range at "
-                '"{}" to be ({}..{}) instead of({}..{})? (y/n)'.format(
-                    path,
-                    from_id,
-                    to_id,
-                    current_log_group.range[0],
-                    current_log_group.range[1],
-                )
+                f'Are you sure you want to set the log range at "{path}" to be ({from_id}..{to_id}) instead of({current_log_group.range[0]}..{current_log_group.range[1]})? (y/n)'
             ):
                 return
-            version = c.set_log_group_range(str(path), from_id, to_id)
-            cprint(
-                "Log group '{}' has been updated in version {}!".format(path, version)
-            )
+            version = c.set_log_group_range(path, from_id, to_id)
+            cprint(f"Log group '{path}' has been updated in version {version}!")
 
         except LogDeviceError as e:
-            cprint("Cannot update range for '{}': {}".format(path, e), "red")
+            cprint(f"Cannot update range for '{path}': {e}", "red")
 
     @command
     @argument(
@@ -824,64 +795,52 @@ class Logs:
         try:
             c = _get_client()
             if not context.get_context().args.yes and not confirm(
-                "Are you sure you want to REMOVE " "'{}'? (y/n)".format(path)
+                f"Are you sure you want to REMOVE '{path}'? (y/n)"
             ):
                 return
             try:
-                version = c.remove_log_group(str(path))
+                version = c.remove_log_group(path)
             except LogDeviceError as e:
                 if e.args[0] == ErrorStatus.NOTFOUND:
-                    version = c.remove_directory(str(path), recursive)
+                    version = c.remove_directory(path, recursive)
                 raise  # will be caught and reported by outer except
-            cprint("'{}' has been removed in version {}".format(path, version))
+            cprint(f"'{path}' has been removed in version {version}")
 
         except LogDeviceError as e:
-            cprint("Cannot remove '{}'. Reason: {}".format(path, e.args[2]), "red")
+            cprint(f"Cannot remove '{path}'. Reason: {e.args[2]}", "red")
 
             return 1
 
     def _tail_attributes_single(self, client, logid):
         try:
             tail_lsn = client.get_tail_lsn(logid)
-            cprint("  Tail lsn: {}".format(helpers.humanize_lsn(tail_lsn)))
+            cprint(f"  Tail lsn: {helpers.humanize_lsn(tail_lsn)}")
             attr = client.get_tail_attributes(logid)
-            cprint(
-                "  Last released real (record) lsn: {}".format(
-                    helpers.humanize_lsn(attr[0])
-                )
-            )
+            cprint(f"  Last released real (record) lsn: {helpers.humanize_lsn(attr[0])}")
             ts = "INVALID!"
             try:
                 ts = datetime.fromtimestamp(attr[1] / 1000)
             except Exception:
                 pass
-            cprint(
-                "  Approximate timestamp of last released real lsn: "
-                "{} -> {}".format(attr[1], ts)
-            )
-            cprint(
-                "  Approximate byte offset of the tail of the log: {}".format(attr[2])
-            )
+            cprint(f"  Approximate timestamp of last released real lsn: {attr[1]} -> {ts}")
+            cprint(f"  Approximate byte offset of the tail of the log: {attr[2]}")
 
         except Exception as e:
-            cprint("Can't get tail attributes: {}".format(e), "red")
+            cprint(f"Can't get tail attributes: {e}", "red")
             return 1
 
     def _head_attributes_single(self, client, logid):
         try:
             attr = client.get_head_attributes(logid)
-            cprint("  Trim point: {}".format(helpers.humanize_lsn(attr[0])))
+            cprint(f"  Trim point: {helpers.humanize_lsn(attr[0])}")
             ts = "INVALID!"
             try:
                 ts = datetime.fromtimestamp(attr[1] / 1000)
             except Exception:
                 pass
-            cprint(
-                "  Approximate timestamp of trim point (ms):"
-                " {} -> {}".format(attr[1], ts)
-            )
+            cprint(f"  Approximate timestamp of trim point (ms): {attr[1]} -> {ts}")
         except Exception as e:
-            cprint("Can't get head attributes: {}".format(e), "red")
+            cprint(f"Can't get head attributes: {e}", "red")
             return 1
         return 0
 
@@ -893,11 +852,11 @@ class Logs:
         appended and released for delivery record, its approximate timestamp and
         byte offset.
         """
-        log_id = int(log_id)
+        log_id = log_id
         ctx = context.get_context()
         client = ctx.get_client()
         cprint("Tail Info:")
         self._tail_attributes_single(client, log_id)
         cprint("Head Info:")
         self._head_attributes_single(client, log_id)
-        cprint("Log Empty?: {}".format(client.is_log_empty(log_id)))
+        cprint(f"Log Empty?: {client.is_log_empty(log_id)}")

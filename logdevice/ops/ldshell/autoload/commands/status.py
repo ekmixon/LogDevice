@@ -118,7 +118,7 @@ async def get_host_info(client_factory, *args, **kwargs) -> Optional[HostInfo]:
                 # This way the order of HostInfo's properties does not matter.
                 return HostInfo(**dict(zip(host_tasks.keys(), results)))
     except Exception as ex:
-        cprint("Failed to connect to host: {}".format(str(ex)), file=sys.stderr)
+        cprint(f"Failed to connect to host: {str(ex)}", file=sys.stderr)
         return None
 
 
@@ -151,47 +151,36 @@ async def print_results_tabular(results, *args, **kwargs):
             ),
             (
                 "NAME",
-                lambda result: colored(result.hostname, attrs=["bold"])
-                if not result.uptime
-                else result.hostname,
+                lambda result: result.hostname
+                if result.uptime
+                else colored(result.hostname, attrs=["bold"]),
             ),
-            ("PACKAGE", lambda result: result.package or result.ld_version or "?"),
-            ("STATE", lambda result: result.state if result.state else "?"),
+            (
+                "PACKAGE",
+                lambda result: result.package or result.ld_version or "?",
+            ),
+            ("STATE", lambda result: result.state or "?"),
             (
                 "UPTIME",
-                lambda result: render_uptime(result.uptime) if result.uptime else "?",
+                lambda result: render_uptime(result.uptime)
+                if result.uptime
+                else "?",
             ),
             ("LOCATION", lambda result: result.location),
-            (
-                "SEQ.",
-                lambda result: result.sequencing_state
-                if result.sequencing_state
-                else "?",
-            ),
-            (
-                "DATA HEALTH",
-                lambda result: result.shard_health_state
-                if result.shard_health_state
-                else "?",
-            ),
+            ("SEQ.", lambda result: result.sequencing_state or "?"),
+            ("DATA HEALTH", lambda result: result.shard_health_state or "?"),
             (
                 "STORAGE STATE",
-                lambda result: result.shard_storage_state
-                if result.shard_storage_state
-                else "?",
+                lambda result: result.shard_storage_state or "?",
             ),
             (
                 "SHARD OP.",
-                lambda result: result.shard_operational_state
-                if result.shard_operational_state
-                else "?",
+                lambda result: result.shard_operational_state or "?",
             ),
-            (
-                "HEALTH STATUS",
-                lambda result: result.health_status if result.health_status else "?",
-            ),
+            ("HEALTH STATUS", lambda result: result.health_status or "?"),
         ]
     )
+
 
     apply_additional_changes = await add_additional_table_columns(columns)
 
@@ -269,14 +258,15 @@ def color_seq_state(seq_state: SequencingState):
 
 
 def color_service_state(service_state: DaemonState):
-    if service_state == DaemonState.UNKNOWN:
+    if (
+        service_state == DaemonState.UNKNOWN
+        or service_state != DaemonState.STARTING_UP
+        and service_state != DaemonState.SHUTTING_DOWN
+        and service_state == DaemonState.DEAD
+    ):
         return colored(service_state.name, "red")
-    elif service_state == DaemonState.STARTING_UP:
+    elif service_state in [DaemonState.STARTING_UP, DaemonState.SHUTTING_DOWN]:
         return colored(service_state.name, "yellow")
-    elif service_state == DaemonState.SHUTTING_DOWN:
-        return colored(service_state.name, "yellow")
-    elif service_state == DaemonState.DEAD:
-        return colored(service_state.name, "red")
     return service_state.name
 
 
@@ -294,22 +284,28 @@ def color_service_health_status(service_health_status: DaemonHealthStatus):
 
 def interpret_by_frequency(items):
     return ",".join(
-        "{}({})".format(name, count) for name, count in Counter(items).most_common()
+        f"{name}({count})" for name, count in Counter(items).most_common()
     )
 
 
 def interpret_shard_health_states(shard_states):
-    if not shard_states:
-        return " "
-    return interpret_by_frequency(
-        [color_data_health(shard.data_health) for shard in shard_states]
+    return (
+        interpret_by_frequency(
+            [color_data_health(shard.data_health) for shard in shard_states]
+        )
+        if shard_states
+        else " "
     )
 
 
 def interpret_shard_storage_states(shard_states):
-    if not shard_states:
-        return " "
-    return interpret_by_frequency([shard.storage_state.name for shard in shard_states])
+    return (
+        interpret_by_frequency(
+            [shard.storage_state.name for shard in shard_states]
+        )
+        if shard_states
+        else " "
+    )
 
 
 def interpret_shard_operational_states(shard_states):
@@ -330,10 +326,7 @@ def interpret_shard_operational_states(shard_states):
                 targets.extend(s.maintenance.target_states)
             progress = color_maintenance_state(s.maintenance.status)
     target = interpret_by_frequency([color_op_state(target_i) for target_i in targets])
-    if current != target:
-        return f"{current} -> {target}  {progress}"
-    else:
-        return current
+    return f"{current} -> {target}  {progress}" if current != target else current
 
 
 def filter_merged_information(status_data, nodes, hostnames):
@@ -407,7 +400,7 @@ async def get_nodes_state(admin_client, force):
     try:
         res = await admin_api.get_nodes_state(admin_client, req=request_opts)
     except Exception as ex:
-        cprint("Failed to request NodesState(): {}".format(str(ex)), file=sys.stderr)
+        cprint(f"Failed to request NodesState(): {str(ex)}", file=sys.stderr)
         return None
     return res
 

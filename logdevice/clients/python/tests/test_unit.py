@@ -57,9 +57,7 @@ class LogDeviceUnitTest(unittest.TestCase):
         test(loggingLevel.DEBUG)
         test(loggingLevel.SPEW)
 
-        self.assertEqual(
-            logdevice.client.parse_log_level(str("error")), loggingLevel.ERROR
-        )
+        self.assertEqual(logdevice.client.parse_log_level("error"), loggingLevel.ERROR)
 
     def test_lsn_to_string(self):
         tests = ((283467847824, "e66n6288"), (85899668877, "e20n322957"))

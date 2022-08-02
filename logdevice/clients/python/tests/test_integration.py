@@ -73,11 +73,7 @@ class LogDeviceIntegrationTest(TestCase):
         records = []
         for data, gap in reader:
             if gap is not None:
-                print(
-                    "gap: log {} type {} lo {} hi {}".format(
-                        gap.logid, gap.type, gap.lo, gap.hi
-                    )
-                )
+                print(f"gap: log {gap.logid} type {gap.type} lo {gap.lo} hi {gap.hi}")
                 self.assertEqual(gap.type, ld.GapType.BRIDGE)
             else:
                 print(
@@ -101,7 +97,7 @@ class LogDeviceIntegrationTest(TestCase):
 
     def test_client_create(self):
         name = "cluster_name?"
-        config = "file:" + self.cluster.config_path
+        config = f"file:{self.cluster.config_path}"
 
         client = ld.Client(name, config)
         self.assertIsNotNone(client)
@@ -132,10 +128,7 @@ class LogDeviceIntegrationTest(TestCase):
             # Read from LSN_OLDEST to the last written LSN
             reader.start_reading(logid, logdevice.client.LSN_OLDEST, until_lsn)
 
-        nread = 0
-        for data, _ in reader:
-            if data is not None:
-                nread += 1
+        nread = sum(data is not None for data, _ in reader)
         self.assertEqual(NWRITES, nread)
 
     def test_is_log_empty(self):
@@ -212,31 +205,30 @@ class LogDeviceIntegrationTest(TestCase):
         client = self.client()
         self.assertIsNotNone(client)
         # correct single setting
-        ret = client.settings.set(str("node-stats-send-period"), str("66s"))
-        out = client.settings.get(str("node-stats-send-period"))
+        ret = client.settings.set("node-stats-send-period", "66s")
+        out = client.settings.get("node-stats-send-period")
         self.assertEqual(ret, 0)
-        self.assertEqual(out, str("66s"))
+        self.assertEqual(out, "66s")
         # correct multiple settings
         test_settings = {
-            str("node-stats-send-period"): str("60s"),
-            str("include-cluster-name-on-handshake"): str("false"),
+            "node-stats-send-period": "60s",
+            "include-cluster-name-on-handshake": "false",
         }
+
         ret = client.settings.set(test_settings)
         self.assertEqual(ret, 0)
-        out = client.settings.get(str("node-stats-send-period"))
-        self.assertEqual(out, str("60s"))
-        out = client.settings.get(str("include-cluster-name-on-handshake"))
-        self.assertEqual(out, str("false"))
+        out = client.settings.get("node-stats-send-period")
+        self.assertEqual(out, "60s")
+        out = client.settings.get("include-cluster-name-on-handshake")
+        self.assertEqual(out, "false")
         # incorrect set
         with self.assertRaises(ld.LogDeviceError):
-            client.settings.set(str("mock-setting"), str("whatever"))
+            client.settings.set("mock-setting", "whatever")
         # incorrect get
         with self.assertRaises(KeyError):
-            client.settings.get(str("mock-setting"))
+            client.settings.get("mock-setting")
         # another correct single set
-        ret = client.settings.set(
-            str("include-cluster-name-on-handshake"), str("false")
-        )
-        out = client.settings.get(str("include-cluster-name-on-handshake"))
+        ret = client.settings.set("include-cluster-name-on-handshake", "false")
+        out = client.settings.get("include-cluster-name-on-handshake")
         self.assertEqual(ret, 0)
-        self.assertEqual(out, str("false"))
+        self.assertEqual(out, "false")

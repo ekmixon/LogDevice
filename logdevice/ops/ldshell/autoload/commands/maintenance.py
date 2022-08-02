@@ -48,7 +48,7 @@ class RenderingMode(Enum):
     EXPANDED_WITH_SAFETY_CHECKS = "expanded_with_safety_checks"
 
     def __repr__(self):
-        return "<%s.%s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}.{self.name}>"
 
 
 def _render(
@@ -93,11 +93,7 @@ def _render_compact(
             shard_progress = "-"
 
         if mv.affects_sequencers:
-            if mv.are_all_sequencers_done:
-                color = "green"
-            else:
-                color = "yellow"
-
+            color = "green" if mv.are_all_sequencers_done else "yellow"
             sequencer_progress = colored(
                 # pyre-ignore
                 f"{mv.sequencer_target_state.name}"
@@ -119,16 +115,8 @@ def _render_compact(
         else:
             created_reason = "-"
 
-        if mv.created_on:
-            created_on = str(mv.created_on)
-        else:
-            created_on = "-"
-
-        if mv.expires_on:
-            expires_on = naturaltime(mv.expires_on)
-        else:
-            expires_on = "-"
-
+        created_on = str(mv.created_on) if mv.created_on else "-"
+        expires_on = naturaltime(mv.expires_on) if mv.expires_on else "-"
         return (
             id,
             affected,
@@ -218,10 +206,7 @@ def _render_expanded(
             created_by = mv.user
             tbl.append(["Created By", created_by])
 
-            if mv.reason:
-                created_reason = mv.reason
-            else:
-                created_reason = "-"
+            created_reason = mv.reason or "-"
             tbl.append(["Reason", created_reason])
 
             if mv.extras:
@@ -263,8 +248,8 @@ def _render_expanded(
             return tabulate(tabular_data=tbl, tablefmt="plain")
 
         def shards(
-            mv: MaintenanceView, cv: ClusterView, expand_shards: bool
-        ) -> Optional[str]:
+                    mv: MaintenanceView, cv: ClusterView, expand_shards: bool
+                ) -> Optional[str]:
             def aggregated(mv: MaintenanceView, cv: ClusterView) -> str:
                 headers = [
                     "NODE INDEX",
@@ -416,11 +401,7 @@ def _render_expanded(
             if not mv.affects_shards:
                 return None
 
-            if expand_shards:
-                f = expanded
-            else:
-                f = aggregated
-
+            f = expanded if expand_shards else aggregated
             return "Shard Maintenances:\n" + indent(f(mv, cv), "  ")
 
         def sequencers(mv: MaintenanceView, cv: ClusterView) -> Optional[str]:
@@ -534,21 +515,21 @@ def _color_maintenance_status(arg: MaintenanceStatus) -> str:
         MaintenanceStatus.BLOCKED_UNTIL_SAFE,
         MaintenanceStatus.REBUILDING_IS_BLOCKED,
     }:
-        color = "red"
+        return "red"
     elif arg == MaintenanceStatus.COMPLETED:
-        color = "green"
+        return "green"
     else:
-        color = "yellow"
-    return color
+        return "yellow"
 
 
 def _color_maintenance_overall_status(arg: MaintenanceProgress) -> str:
     color = "white"
     if arg == MaintenanceProgress.COMPLETED:
         color = "green"
-    elif arg == MaintenanceProgress.BLOCKED_UNTIL_SAFE:
-        color = "red"
-    elif arg == MaintenanceProgress.UNKNOWN:
+    elif arg in [
+        MaintenanceProgress.BLOCKED_UNTIL_SAFE,
+        MaintenanceProgress.UNKNOWN,
+    ]:
         color = "red"
     elif arg == MaintenanceProgress.IN_PROGRESS:
         color = "yellow"
@@ -595,10 +576,7 @@ def _satisfy_shard_op_state(
 def _color_shard_op_state(
     cur: ShardOperationalState, tgt: ShardOperationalState
 ) -> str:
-    if _satisfy_shard_op_state(cur, tgt):
-        return "green"
-    else:
-        return "yellow"
+    return "green" if _satisfy_shard_op_state(cur, tgt) else "yellow"
 
 
 def _filter_maintenance_views(
@@ -615,7 +593,7 @@ def _filter_maintenance_views(
     include_internal_maintenances: Optional[bool] = None,
 ) -> Generator[MaintenanceView, None, None]:
     cv = cluster_view
-    mvs = (mv for mv in maintenance_views)
+    mvs = iter(maintenance_views)
 
     # Filter out internal maintenances unless explicitly requested to unhide
     # them
@@ -725,11 +703,11 @@ class MaintenanceCommand:
                 include_internal_maintenances=None,
             )
         )
-        if len(mvs) == 0:
-            return colored("No maintenances matching given criteria", "red")
-        else:
-            # pyre-ignore
-            return _render(maintenance_views=mvs, cluster_view=cv, mode=rendering_mode)
+        return (
+            _render(maintenance_views=mvs, cluster_view=cv, mode=rendering_mode)
+            if mvs
+            else colored("No maintenances matching given criteria", "red")
+        )
 
     @command("list")
     @argument(
@@ -1080,20 +1058,19 @@ class MaintenanceCommand:
             )
         )
 
-        if len(mvs) == 0 and include_internal_maintenances:
-            print(colored("No maintenances matching given criteria", "white"))
-            return
-        elif len(mvs) == 0:
-            print(
-                colored(
-                    "No maintenances matching given criteria, did you "
-                    "mean to target internal maintenances?\nUse "
-                    "`include-internal-maintenances` for this.",
-                    "white",
+        if not mvs:
+            if include_internal_maintenances:
+                print(colored("No maintenances matching given criteria", "white"))
+            else:
+                print(
+                    colored(
+                        "No maintenances matching given criteria, did you "
+                        "mean to target internal maintenances?\nUse "
+                        "`include-internal-maintenances` for this.",
+                        "white",
+                    )
                 )
-            )
             return
-
         print("You are going to remove following maintenances:\n")
         print(_render_expanded(mvs, cv, False))
 

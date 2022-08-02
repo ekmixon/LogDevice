@@ -66,7 +66,6 @@ class TaskQueue:
         self.state = state
         self.mutex = threading.Lock()
         self.next_task_no = 1
-        pass
 
     def reachedMaxFailures(self):
         with self.mutex as mutex:
@@ -99,7 +98,7 @@ def worker(root, queue, state):
         if task_no is None:
             return
         global ARGS
-        outpath = os.path.join(root, "{}.out".format(str(task_no)))
+        outpath = os.path.join(root, f"{str(task_no)}.out")
         with open(outpath, "wt") as outfile, open(os.devnull, "r") as devnull_r:
             proc = subprocess.Popen(
                 ARGS.cmd, stdin=devnull_r, stdout=outfile, stderr=subprocess.STDOUT
@@ -115,11 +114,10 @@ def worker(root, queue, state):
             state.ok += 1
         else:
             print(
-                "Job {} (pid {}) failed with code {}, output in {}".format(
-                    task_no, proc.pid, proc.returncode, outpath
-                ),
+                f"Job {task_no} (pid {proc.pid}) failed with code {proc.returncode}, output in {outpath}",
                 file=sys.stderr,
             )
+
             state.fail += 1
 
 
@@ -157,7 +155,7 @@ if __name__ == "__main__":
     state = WorkersSharedState()
     stats = Stats(state)
     root = tempfile.mkdtemp(prefix="stress.")
-    print("Saving output to {}/*.out".format(root))
+    print(f"Saving output to {root}/*.out")
 
     queue = TaskQueue(
         ntasks=ARGS.instances, max_failures=ARGS.max_failures, state=state

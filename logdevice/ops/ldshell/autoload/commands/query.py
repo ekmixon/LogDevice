@@ -36,7 +36,7 @@ def uniquify_names(names):
         # If a name is not unique, append suffix to all occurrences.
         # E.g. turn ["a", "a"] into ["a[0]", "a[1]"], not ["a", "a[0]"]
         while new_name in seen or (not unique and i == 0):
-            new_name = name + "[" + str(i) + "]"
+            new_name = f"{name}[{i}]"
             i += 1
         seen.add(new_name)
         res.append(new_name)
@@ -48,9 +48,7 @@ def uniquify_names(names):
 
 def _table_printer(headers, rows, column_sizes, delimiter, no_header):
     if not column_sizes:
-        column_sizes = []
-        for idx in range(len(headers)):
-            column_sizes.append(len(headers[idx]))
+        column_sizes = [len(headers[idx]) for idx in range(len(headers))]
         for row in rows:
             for idx in range(len(headers)):
                 column_sizes[idx] = max(column_sizes[idx], len(row[idx]))
@@ -83,9 +81,9 @@ def _line_printer(headers, rows, column_sizes, delimiter, no_header):
     for row in rows:
         for hdr_idx in range(len(headers)):
             if no_header:
-                cprint("{}".format(row[hdr_idx]))
+                cprint(f"{row[hdr_idx]}")
             else:
-                cprint("{} = {}".format(headers[hdr_idx], row[hdr_idx]))
+                cprint(f"{headers[hdr_idx]} = {row[hdr_idx]}")
         cprint("")
 
 
@@ -180,15 +178,14 @@ class SelectCommand(Command):
             # works if we are writing and from is the previous word
             elements = document.text_before_cursor.split()
             found = False
-            if elements:
-                if len(elements) > 1:
-                    if elements[-1].lower() == "from":
-                        found = True
-                    if (
-                        document.char_before_cursor != " "
-                        and elements[-2].lower() == "from"
-                    ):
-                        found = True
+            if elements and len(elements) > 1:
+                if elements[-1].lower() == "from":
+                    found = True
+                if (
+                    document.char_before_cursor != " "
+                    and elements[-2].lower() == "from"
+                ):
+                    found = True
             if found:
                 return self._table_completer.get_completions(document, complete_event)
         return []
@@ -218,34 +215,31 @@ class SelectCommand(Command):
                             "\n".join(textwrap.wrap(c.description, width=40)),
                         ]
                     )
-                print(str(pretty))
+                print(pretty)
                 return None
-                break
-        else:
-            return "Unknown table `{}`".format(input)
+        return f"Unknown table `{input}`"
 
     def run_last_query(self, cmd, input, raw):
-        if input and input.strip().lower() == "details":
-            if self._last_res is None:
-                cprint("You need to run a query before running this command", "magenta")
-                return "NO-QUERY"
-            if not self._last_res.failed_nodes_count:
-                print()
-                cprint("No Failures", "cyan")
-            else:
-                print()
-                cprint("Failures:", "magenta")
-                failure_table = PrettyTable(["Address", "Failure"])
-                for node_failure in self._last_res.failed_nodes:
-                    failure_table.add_row(
-                        [
-                            node_failure.data().address,
-                            node_failure.data().failure_reason,
-                        ]
-                    )
-                cprint(str(failure_table))
-        else:
+        if not input or input.strip().lower() != "details":
             raise NotImplementedError("Not implemented yet!")
+        if self._last_res is None:
+            cprint("You need to run a query before running this command", "magenta")
+            return "NO-QUERY"
+        if not self._last_res.failed_nodes_count:
+            print()
+            cprint("No Failures", "cyan")
+        else:
+            print()
+            cprint("Failures:", "magenta")
+            failure_table = PrettyTable(["Address", "Failure"])
+            for node_failure in self._last_res.failed_nodes:
+                failure_table.add_row(
+                    [
+                        node_failure.data().address,
+                        node_failure.data().failure_reason,
+                    ]
+                )
+            cprint(str(failure_table))
 
     def run_tables(self, cmd, input, raw):
         pretty = PrettyTable(["Table", "Description"])
@@ -254,12 +248,12 @@ class SelectCommand(Command):
             pretty.add_row(
                 [table.name, "\n".join(textwrap.wrap(table.description, width=40))]
             )
-        print(str(pretty))
+        print(pretty)
 
     def run_ttl(self, cmd, input, raw):
         if input is None or input == "":
             ttl = self.ldquery.cache_ttl
-            cprint("Cache TTL is {} seconds".format(ttl))
+            cprint(f"Cache TTL is {ttl} seconds")
         else:
             try:
                 ttl = int(input)
@@ -267,15 +261,11 @@ class SelectCommand(Command):
                 cprint("Usage: :ttl <number>")
                 return
             self.ldquery.cache_ttl = ttl
-            cprint("Cache TTL set to {} seconds".format(ttl))
+            cprint(f"Cache TTL set to {ttl} seconds")
 
     def run_pretty(self, cmd, input, raw):
         if input is None or input == "":
-            cprint(
-                "Pretty output is {}".format(
-                    "on" if self.ldquery.pretty_output else "off"
-                )
-            )
+            cprint(f'Pretty output is {"on" if self.ldquery.pretty_output else "off"}')
             return
         if input in {"no", "off", "false", "0", "nope", "nah", "disable", "disabled"}:
             pretty = False
@@ -295,19 +285,14 @@ class SelectCommand(Command):
             cprint("Usage: :pretty on|off")
             return
         self.ldquery.pretty_output = pretty
-        cprint(
-            "Pretty output set to {}".format(
-                "on" if self.ldquery.pretty_output else "off"
-            )
-        )
+        cprint(f'Pretty output set to {"on" if self.ldquery.pretty_output else "off"}')
 
     def run_server_side_filtering(self, cmd, input, raw):
         if input is None or input == "":
             cprint(
-                "Server-side filtering is {}".format(
-                    "on" if self.ldquery.server_side_filtering else "off"
-                )
+                f'Server-side filtering is {"on" if self.ldquery.server_side_filtering else "off"}'
             )
+
             return
         if input in {"no", "off", "false", "0", "nope", "nah", "disable", "disabled"}:
             enabled = False
@@ -328,9 +313,7 @@ class SelectCommand(Command):
             return
         self.ldquery.server_side_filtering = enabled
         cprint(
-            "Server-side filtering is {}".format(
-                "on" if self.ldquery.server_side_filtering else "off"
-            )
+            f'Server-side filtering is {"on" if self.ldquery.server_side_filtering else "off"}'
         )
 
     def run_no_header(self, cmd, input, raw):
@@ -356,18 +339,18 @@ class SelectCommand(Command):
             return
 
         self.no_header = no_header
-        cprint("No header is {}".format("on" if self.no_header else "off"))
+        cprint(f'No header is {"on" if self.no_header else "off"}')
 
     def run_output_format(self, cmd, input, raw):
         if input is None or input == "":
-            cprint("Output format is {}".format(self.output_format))
+            cprint(f"Output format is {self.output_format}")
             return
         if input in PRINTER_MAP:
             self.output_format = input
         else:
             cprint("Usage: :output-format table|list|line|csv", "red")
             return
-        cprint("Output format is {}".format(self.output_format))
+        cprint(f"Output format is {self.output_format}")
 
     def run_select(self, cmd, input, query):
         from logdevice.ldquery import LDQueryError, StatementError
@@ -390,11 +373,10 @@ class SelectCommand(Command):
             if res.failed_nodes_count:
                 cprint("[WARNING] Incomplete results due to node(s) failures", "yellow")
                 cprint(
-                    "{}/{} nodes failed during that query".format(
-                        res.failed_nodes_count, res.total_nodes_count
-                    ),
+                    f"{res.failed_nodes_count}/{res.total_nodes_count} nodes failed during that query",
                     "red",
                 )
+
 
                 per_failure_type = {}
                 for n in res.failed_nodes:
@@ -405,22 +387,22 @@ class SelectCommand(Command):
                 for k, v in per_failure_type.items():
                     failure_table.add_row([k, ",".join(map(str, v))])
                 print("--> Failure Stats")
-                print(str(failure_table))
+                print(failure_table)
 
             print("{0:d} rows in set ({1:.2f} msec)".format(res.count, res.latency))
 
             return None
         except RuntimeError as e:
             print()
-            cprint("[ERROR] A runtime error occured: {}".format(str(e)), "red")
+            cprint(f"[ERROR] A runtime error occured: {str(e)}", "red")
             return "Unexpected Runtime Error"
         except StatementError as e:
             print()
-            cprint("[ERROR] Invalid Statement: {}".format(str(e)), "red")
+            cprint(f"[ERROR] Invalid Statement: {str(e)}", "red")
             return "Invalid Statement"
         except LDQueryError as e:
             print()
-            cprint("[ERROR] Something went wrong in ldquery: {}".format(str(e)), "red")
+            cprint(f"[ERROR] Something went wrong in ldquery: {str(e)}", "red")
             return "Unexpected Query Error"
 
     def run_interactive(self, cmd, input, query):
@@ -433,7 +415,7 @@ class SelectCommand(Command):
                 )
                 return 1
         except Exception as e:
-            cprint("Error running command: {}".format(str(e)), "red")
+            cprint(f"Error running command: {str(e)}", "red")
             cprint("-" * 60, "yellow")
             traceback.print_exc(file=sys.stderr)
             cprint("-" * 60, "yellow")
@@ -447,8 +429,7 @@ class SelectCommand(Command):
             ttl_was = self.ldquery.cache_ttl
             self.ldquery.cache_ttl = 0
         try:
-            errstr = self._cmds_map[cmd.lower()](cmd, input, query)
-            if errstr:
+            if errstr := self._cmds_map[cmd.lower()](cmd, input, query):
                 print(errstr)
             return 0
         finally:
@@ -464,7 +445,7 @@ class SelectCommand(Command):
             self.ldquery.pretty_output = True
         if args.output_format:
             if args.output_format not in PRINTER_MAP:
-                cprint("Invalid --output-format '{}'".format(args.output_format))
+                cprint(f"Invalid --output-format '{args.output_format}'")
                 return 1
             self.output_format = args.output_format
         if args.disable_server_side_filtering:

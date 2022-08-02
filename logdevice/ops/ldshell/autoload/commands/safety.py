@@ -211,9 +211,7 @@ async def check_impact(
     if not short:
         # pyre-fixme[6]: Expected `List[ShardID]` for 2nd param but got `List[str]`.
         print(check_impact_string(response, shards, target_state))
-    if not response.impact:
-        return 0
-    return 1
+    return 1 if response.impact else 0
 
 
 @command
@@ -248,8 +246,11 @@ def check_impact_string(
     if response.internal_logs_affected:
         lines.append(colored("CRITICAL: Internal Logs are affected negatively!", "red"))
     if response.logs_affected is not None:
-        for impact_on_epoch in response.logs_affected:
-            lines.append(impact_on_log_string(impact_on_epoch, shards, target_state))
+        lines.extend(
+            impact_on_log_string(impact_on_epoch, shards, target_state)
+            for impact_on_epoch in response.logs_affected
+        )
+
     return "\n".join(lines)
 
 
@@ -276,8 +277,7 @@ def replication_factor(replication):
 
 
 def make_table():
-    table = pt.PrettyTable(align="c")
-    return table
+    return pt.PrettyTable(align="c")
 
 
 def reverse_sort_replication(
@@ -286,10 +286,10 @@ def reverse_sort_replication(
     """
     Sort scopes from smaller to bigger (NODE, RACK, ROW, etc.)
     """
-    output = []
-    for loc_scope in sorted(replication.keys(), key=lambda x: x.value):
-        output.append((loc_scope, replication[loc_scope]))
-    return output
+    return [
+        (loc_scope, replication[loc_scope])
+        for loc_scope in sorted(replication.keys(), key=lambda x: x.value)
+    ]
 
 
 def get_biggest_scope(replication: ReplicationProperty) -> LocationScope:
@@ -363,7 +363,7 @@ def normalize_replication(replication: ReplicationProperty) -> ReplicationProper
     If we got replication {cluster: 3}, it actually means {cluster: 3, node: 3}
     """
     repl = dict(replication)
-    replication_factor = max(v for v in repl.values())
+    replication_factor = max(repl.values())
     repl[LocationScope.NODE] = replication_factor
     return ReplicationProperty(repl)
 
@@ -374,9 +374,10 @@ def analyze_write_availability(
     n_writeable_after = n_writeable_before - n_writeable_loss
     n_writeable_after_visual = ""
     sorted_replication = reverse_sort_replication(replication)
-    formatted_replications = []
-    for scope, v in sorted_replication:
-        formatted_replications.append(f"{v} {scope.name.lower()}s")
+    formatted_replications = [
+        f"{v} {scope.name.lower()}s" for scope, v in sorted_replication
+    ]
+
     formatted_replication_str = " in ".join(formatted_replications)
     if n_writeable_after != n_writeable_before:
         n_writeable_after_visual = f" \u2192 {n_writeable_after} "
@@ -391,7 +392,6 @@ def analyze_write_availability(
 def impact_on_log_string(
     impact: ImpactOnEpoch, shards: List[ShardID], target_state: ShardStorageState
 ) -> str:
-    lines = []
     log_id = (
         str(impact.log_id) if impact.log_id != 0 else colored("METADATA-LOGS", "cyan")
     )
@@ -430,30 +430,32 @@ def impact_on_log_string(
 
         # A readable shard is a fully authoritative
         # ALIVE + HEALTHY + READ_ONLY/WRITE
-        if meta.storage_state in [
-            ShardStorageState.READ_WRITE,
-            ShardStorageState.READ_ONLY,
-        ]:
-            # The part of the storage set that should be read available is all
-            # READ_{ONLY, WRITE} shards that are non-EMPTY
-            if meta.data_health != ShardDataHealth.EMPTY:
-                # This is a shard is/may/will be read unavailable.
-                if (
+        if (
+            meta.storage_state
+            in [
+                ShardStorageState.READ_WRITE,
+                ShardStorageState.READ_ONLY,
+            ]
+            and meta.data_health != ShardDataHealth.EMPTY
+            and (
+                (
                     not meta.is_alive
                     or meta.data_health != ShardDataHealth.HEALTHY
                     or (
                         is_in_target_shards
                         and target_state == ShardStorageState.DISABLED
                     )
-                ):
-                    # For each domain in the replication property, add the location
-                    # string as a read unavailable target
-                    for scope in replication.keys():
-                        loc_tag = location_up_to_scope(shard, loc_per_scope, scope)
-                        # If shard location is x.y.a.b and replication is rack:
-                        # X, node: Y. Then the x.y.a should be added to key
-                        # NodeLocation.RACK and x.y.a.b to NodeLocation.NODE
-                        read_unavailable[scope][loc_tag].add(shard)
+                )
+            )
+        ):
+            # For each domain in the replication property, add the location
+            # string as a read unavailable target
+            for scope in replication.keys():
+                loc_tag = location_up_to_scope(shard, loc_per_scope, scope)
+                # If shard location is x.y.a.b and replication is rack:
+                # X, node: Y. Then the x.y.a should be added to key
+                # NodeLocation.RACK and x.y.a.b to NodeLocation.NODE
+                read_unavailable[scope][loc_tag].add(shard)
 
         color = "green" if meta.is_alive else "red"
         attrs = ["bold"] if is_in_target_shards else []
@@ -492,24 +494,24 @@ def impact_on_log_string(
         internal_log_name = colored(get_internal_log_name(impact.log_id), "cyan")
         internal_visual = f"({internal_log_name})"
 
-    lines.append("")
     replication_str = ", ".join(
         [f"{k.name.lower()}: {v}" for k, v in impact.replication.items()]
     )
-    lines.extend(
-        [
+    lines = [
+        "",
+        *[
             f"Log: {log_id} {internal_visual}  ",
             f"Epoch: {epoch:<12}  ",
             f"Storage-set Size: {len(impact.storage_set):<5}",
-        ]
-    )
-    lines.append(f"Replication: {{{replication_str}}}  ")
-    # Write/Rebuilding Availability
-    lines.append(analyze_write_availability(n_writeable, n_writeable_loss, replication))
-    # Read/F-Majority Availability
-    lines.append(analyze_read_availability(read_unavailable, replication))
-    lines.append(colored(f"Impact: {impact_str}", "red"))
+            f"Replication: {{{replication_str}}}  ",
+            analyze_write_availability(
+                n_writeable, n_writeable_loss, replication
+            ),
+            analyze_read_availability(read_unavailable, replication),
+            colored(f"Impact: {impact_str}", "red"),
+        ],
+    ]
+
     for table in tables:
-        lines.append(table.get_string())
-        lines.append("")
+        lines.extend((table.get_string(), ""))
     return "\n".join(lines)

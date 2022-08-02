@@ -41,8 +41,7 @@ class LogDevicePlugin(PluginInterface):
         pass
 
     def get_commands(self):
-        commands = [Connect(), SelectCommand()]
-        return commands
+        return [Connect(), SelectCommand()]
 
     def get_opts_parser(self, add_help=True):
         """

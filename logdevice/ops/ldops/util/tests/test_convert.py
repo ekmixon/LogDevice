@@ -89,8 +89,6 @@ class ConvertTestCase(TestCase):
             convert.to_replication(invalid_input1)
 
         valid_input = {"node": 3, "Rack": 4}
-        expected = {}
-        expected[LocationScope.RACK] = 4
-        expected[LocationScope.NODE] = 3
+        expected = {LocationScope.RACK: 4, LocationScope.NODE: 3}
         expected = ReplicationProperty(expected)
         self.assertEqual(expected, convert.to_replication(valid_input))

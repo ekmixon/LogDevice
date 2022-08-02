@@ -42,5 +42,5 @@ class Node:
         return NodeID(
             node_index=self.node_index,
             address=self.data_addr.to_thrift() if self.data_addr else None,
-            name=self.name if self.name else None,
+            name=self.name or None,
         )

@@ -222,17 +222,18 @@ def run_shipit(fbsource, project_name, output_dir):
     cmd = [
         'php',
         '/var/www/scripts/opensource/shipit/run_shipit.php',
-        '--project=' + project_name,
+        f'--project={project_name}',
         '--create-new-repo',
-        '--source-repo-dir=' + fbsource,
+        f'--source-repo-dir={fbsource}',
         '--source-branch=.',
         '--skip-source-init',
         '--skip-source-pull',
         '--skip-source-clean',
         '--skip-push',
         '--destination-use-anonymous-https',
-        '--create-new-repo-output-path=' + output_dir,
+        f'--create-new-repo-output-path={output_dir}',
     ]
+
     run_command(*cmd)
 
     # Remove the .git directory from the repository it generated.

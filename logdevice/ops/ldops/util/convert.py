@@ -62,10 +62,10 @@ def to_storage_state(raw_state: str) -> ShardStorageState:
 
     E.g., Valid inputs ["read-only", "read_only", "READ_ONLY", "READ-ONLY", ...]
     """
-    normal_state = raw_state.upper().replace("-", "_")
-    if not normal_state:
+    if normal_state := raw_state.upper().replace("-", "_"):
+        return ShardStorageState[normal_state]
+    else:
         raise ValueError("Cannot parse empty storage-state")
-    return ShardStorageState[normal_state]
 
 
 def to_replication(

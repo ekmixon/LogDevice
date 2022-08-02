@@ -86,10 +86,7 @@ class MaintenanceView:
 
     @property
     def shard_target_state(self) -> Optional[ShardOperationalState]:
-        if self.affects_shards:
-            return self._maintenance.shard_target_state
-        else:
-            return None
+        return self._maintenance.shard_target_state if self.affects_shards else None
 
     @property
     def sequencer_target_state(self) -> Optional[SequencingState]:
@@ -129,12 +126,7 @@ class MaintenanceView:
 
     @property
     def expires_in(self) -> Optional[timedelta]:
-        if self.expires_on is None:
-            return None
-        else:
-            # pyre-fixme[58]: `-` is not supported for operand types
-            #  `Optional[datetime]` and `datetime`.
-            return self.expires_on - datetime.now()
+        return None if self.expires_on is None else self.expires_on - datetime.now()
 
     @property
     def affects_shards(self) -> bool:
@@ -204,9 +196,7 @@ class MaintenanceView:
     def get_shard_state(self, shard: ShardID) -> Optional[ShardState]:
         assert shard.node.node_index is not None
         node = self._node_index_to_node_view[shard.node.node_index]
-        if node.is_storage:
-            return node.shard_states[shard.shard_index]
-        return None
+        return node.shard_states[shard.shard_index] if node.is_storage else None
 
     def get_sequencer_state(self, sequencer: NodeID) -> Optional[SequencerState]:
         assert sequencer.node_index is not None
@@ -230,18 +220,24 @@ class MaintenanceView:
             # This is not a storage node, we assume that these shards are
             # COMPLETED already since there is nothing to be done.
             return MaintenanceStatus.COMPLETED
-        if self.shard_target_state == ShardOperationalState.MAY_DISAPPEAR:
-            if shard_state.current_operational_state in {
+        if (
+            self.shard_target_state == ShardOperationalState.MAY_DISAPPEAR
+            and shard_state.current_operational_state
+            in {
                 ShardOperationalState.DRAINED,
                 ShardOperationalState.MAY_DISAPPEAR,
                 ShardOperationalState.MIGRATING_DATA,
                 ShardOperationalState.PROVISIONING,
-            }:
-                return MaintenanceStatus.COMPLETED
+            }
+        ):
+            return MaintenanceStatus.COMPLETED
 
-        if self.shard_target_state == ShardOperationalState.DRAINED:
-            if shard_state.current_operational_state == ShardOperationalState.DRAINED:
-                return MaintenanceStatus.COMPLETED
+        if (
+            self.shard_target_state == ShardOperationalState.DRAINED
+            and shard_state.current_operational_state
+            == ShardOperationalState.DRAINED
+        ):
+            return MaintenanceStatus.COMPLETED
 
         if shard_state.maintenance is not None:
             return shard_state.maintenance.status

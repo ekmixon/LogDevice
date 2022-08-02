@@ -61,9 +61,7 @@ class ConfigChecker:
             "test-duration-second",
         ]
         env_dict = self.config_dict[sec_name]
-        if not self.checkItems(params, env_dict, sec_name):
-            return False
-        return True
+        return bool(self.checkItems(params, env_dict, sec_name))
 
     # Check the required-worker-config section
     def checkRequiredSections(self):
@@ -100,15 +98,13 @@ class ConfigChecker:
             ["fanout"],
             ["worker-start-delay-second", "fanout", "restart-backlog-depth"],
         ]
-        i = 0
-        for sub_section in sub_sections:
+        for i, sub_section in enumerate(sub_sections):
             if not self.checkItem(sub_section, required_dict, sec_name):
                 return False
             if not self.checkItems(
                 item_lists[i], required_dict[sub_section], sub_section
             ):
                 return False
-            i += 1
         return True
 
     # check the section for result collections
@@ -155,28 +151,28 @@ class ConfigChecker:
             "max-timestamp-second",
             "throughput-type",
         ]
-        if not self.checkItems(backfill_params, backfill_fig_dict, "backfill figure"):
-            return False
-        return True
+        return bool(
+            self.checkItems(backfill_params, backfill_fig_dict, "backfill figure")
+        )
 
     # Check each section of the configuration file
     # Return false if any section does not pass the check
     def checkConfig(self):
-        if self.checkEnv() and self.checkRequiredSections() and self.checkCollection():
-            return True
-        return False
+        return bool(
+            self.checkEnv()
+            and self.checkRequiredSections()
+            and self.checkCollection()
+        )
 
     # create a command object if command is configured
     def createCommand(self):
-        command = Command(self.config_dict)
-        return command
+        return Command(self.config_dict)
 
     # create an environment obj
     def createEnv(self):
         common_dict = self.config_dict["required-worker-config"]["common-config"]
         publish_dir = common_dict["publish-dir"]
-        env = Environment(publish_dir, self.config_dict["environment"])
-        return env
+        return Environment(publish_dir, self.config_dict["environment"])
 
     # create workers
     # We only create workers when we assign hosts for them. For example, if
@@ -187,37 +183,39 @@ class ConfigChecker:
         total_host_counts = len(env.all_hosts)
         if type == "write":
             worker_count = min(env.writer_counts, total_host_counts)
-            worker_hosts = env.all_hosts[0:worker_count]
-            commands = commands.common_command + " " + commands.write_command
+            worker_hosts = env.all_hosts[:worker_count]
+            commands = f"{commands.common_command} {commands.write_command}"
         elif type == "read":
             worker_count = -1 * min(env.reader_counts, total_host_counts)
             worker_hosts = env.all_hosts[worker_count:]
-            commands = commands.common_command + " " + commands.read_command
+            commands = f"{commands.common_command} {commands.read_command}"
         elif type == "backfill":
             worker_count = min(env.backfill_counts, total_host_counts)
-            worker_hosts = env.all_hosts[0:worker_count]
-            commands = commands.common_command + " " + commands.backfill_command
+            worker_hosts = env.all_hosts[:worker_count]
+            commands = f"{commands.common_command} {commands.backfill_command}"
         else:
             self.logger.error("Illegal worker namne %s", type)
         if len(worker_hosts) > 0 and commands != "":
-            workers = Workers(
-                env.worker_remote_file, worker_hosts, env.execution_inst, type, commands
+            return Workers(
+                env.worker_remote_file,
+                worker_hosts,
+                env.execution_inst,
+                type,
+                commands,
             )
-            return workers
 
     # Create an Results object
     def createResults(self, env):
         common_dict = self.config_dict["required-worker-config"]["common-config"]
         throughput_interval = common_dict["stats-interval-second"]
         publish_dir = common_dict["publish-dir"]
-        results = Results(
+        return Results(
             env.all_hosts,
             publish_dir,
             throughput_interval,
             self.config_dict["collection-config"],
             env.copy_inst,
         )
-        return results
 
     def __init__(self, json_file_name):
         self.logger = logging.getLogger("coordinator.check")
@@ -285,8 +283,7 @@ if __name__ == "__main__":
     host_names = ["write", "read", "backfill"]
 
     for name in host_names:
-        workers = checker.createWorkers(name, command, env)
-        if workers:
+        if workers := checker.createWorkers(name, command, env):
             checker.logger.info(
                 "worker name: %s\n hosts: %d\n start command: %s\n",
                 workers.name,
@@ -296,8 +293,7 @@ if __name__ == "__main__":
         else:
             checker.logger.error("Failed to create %s workers!", name)
 
-    results = checker.createResults(env)
-    if results:
+    if results := checker.createResults(env):
         checker.logger.info(
             " ".join(
                 len(results.hosts),

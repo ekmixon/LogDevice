@@ -47,7 +47,7 @@ class LDShellContext(context.Context):
     def _set_log_level(self, level):
         ld_level = parse_log_level(level)
         self._ld_level = ld_level
-        cprint("Logging Level: {}".format(ld_level), "magenta", file=sys.stderr)
+        cprint(f"Logging Level: {ld_level}", "magenta", file=sys.stderr)
         log_stream = (
             getattr(logging.root.handlers[0], "stream", sys.stderr)
             if logging.root.handlers
@@ -103,7 +103,7 @@ class LDShellContext(context.Context):
             "Creating a logdevice client using config {}", self.get_config_path()
         )
         default_settings = {"on-demand-logs-config": "true", "num-workers": 2}
-        default_settings.update(settings or {})
+        default_settings |= (settings or {})
         return Client(
             "ldshell",
             self.get_config_path(),
@@ -172,14 +172,13 @@ class LDShellContext(context.Context):
                 try:
                     self._initialize_after_connected()
                 except Exception as e:
-                    cprint("{}".format(e), "red", file=sys.stderr)
+                    cprint(f"{e}", "red", file=sys.stderr)
                     self._reset()
                     self._is_connected = False
 
     def on_interactive(self, args):
         self._set_arguments(args)
-        ret = self._registry.find_command("connect").run_cli(args)
-        if ret:
+        if ret := self._registry.find_command("connect").run_cli(args):
             raise exceptions.CommandError("Failed starting interactive mode")
 
     def is_connected(self):
@@ -233,13 +232,13 @@ class LDShellContext(context.Context):
         client = None
         address = self._admin_server_address
         if address.address_family == SocketAddressFamily.INET:
-            client = create_thrift_client(
+            return create_thrift_client(
                 AdminAPI, host=address.address, port=address.port
             )
+
         else:
             # SocketAddressFamily::UNIX
-            client = create_thrift_client(AdminAPI, path=address.address)
-        return client
+            return create_thrift_client(AdminAPI, path=address.address)
 
     def get_client(self):
         self.require_connected()
@@ -259,22 +258,21 @@ class LDShellContext(context.Context):
     def get_prompt_tokens(self) -> typing.List[typing.Tuple[typing.Any, str]]:
         cluster = self.get_cluster_name()
 
-        if cluster is not None:
-            tokens = [
+        return (
+            [
                 (Token.Username, getpass.getuser()),
                 (Token.At, "@"),
                 (Token.Tier, cluster),
                 (Token.Pound, "> "),
             ]
-        else:
-            tokens = [
+            if cluster is not None
+            else [
                 (Token.Username, getpass.getuser()),
                 (Token.Tier, "@"),
                 (Token.RPrompt, "DISCONNECTED"),
                 (Token.Pount, "> "),
             ]
-
-        return tokens
+        )
 
     def get_session_logger(self):
         return self._session_logger

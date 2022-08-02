@@ -234,7 +234,7 @@ class ClusterView:
 
     ### Public interface
     def get_all_node_indexes(self) -> Generator[int, None, None]:
-        return (ni for ni in self._node_indexes)
+        return iter(self._node_indexes)
 
     def get_all_node_views(self) -> Generator[NodeView, None, None]:
         return (self.get_node_view(node_index=ni) for ni in self.get_all_node_indexes())
@@ -243,7 +243,7 @@ class ClusterView:
         return (nv.node_name for nv in self.get_all_node_views())
 
     def get_all_maintenance_ids(self) -> Generator[str, None, None]:
-        return (mnt_id for mnt_id in self._maintenance_ids)
+        return iter(self._maintenance_ids)
 
     def get_all_maintenances(self) -> Generator[MaintenanceDefinition, None, None]:
         return (
@@ -266,25 +266,26 @@ class ClusterView:
     ) -> Tuple[ShardID, ...]:
         shards = list(shards or [])
         node_ids = list(node_ids or [])
-        for node_id in node_ids:
-            shards.append(ShardID(node=node_id, shard_index=ALL_SHARDS))
+        shards.extend(
+            ShardID(node=node_id, shard_index=ALL_SHARDS) for node_id in node_ids
+        )
 
         ret: Set[ShardID] = set()
         for shard in shards:
             node_view = self.get_node_view(
                 node_index=shard.node.node_index, node_name=shard.node.name
             )
-            if not node_view.is_storage:
-                if include_sequencers:
-                    r = [ALL_SHARDS]
-                else:
-                    continue  # pragma: nocover; coverage incorrectly doesn't count this line
-            else:
-                if shard.shard_index == ALL_SHARDS:
-                    r = range(0, node_view.num_shards)
-                else:
-                    r = range(shard.shard_index, shard.shard_index + 1)
+            if node_view.is_storage:
+                r = (
+                    range(node_view.num_shards)
+                    if shard.shard_index == ALL_SHARDS
+                    else range(shard.shard_index, shard.shard_index + 1)
+                )
 
+            elif include_sequencers:
+                r = [ALL_SHARDS]
+            else:
+                continue  # pragma: nocover; coverage incorrectly doesn't count this line
             for shard_index in r:
                 ret.add(ShardID(node=node_view.node_id, shard_index=shard_index))
 
